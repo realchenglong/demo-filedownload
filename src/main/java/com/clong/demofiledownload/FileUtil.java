@@ -1,26 +1,40 @@
-package com.clong.demofiledownload.controller;
+package com.clong.demofiledownload;
 
-import com.clong.demofiledownload.FileUtil;
-import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.apache.tomcat.util.http.fileupload.IOUtils;
+import org.springframework.util.StringUtils;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-@RestController
-public class GreetingController {
+public class FileUtil {
 
-    @GetMapping("/greeting")
-    public String greeting(@RequestParam(value = "name" ,defaultValue = "World")String name){
-        return "hello "+name;
-    }
+    /***
+     * 下载一个文件
+     */
+    public static void outputOneFileByStream(HttpServletRequest request, HttpServletResponse response, String... args) {
+        String filepath = "",downloadName = "";
+        if(!StringUtils.isEmpty(args[0]))
+        {
+            filepath = args[0];
+        }else{
+            return;
+        }
 
-    @ResponseBody
-    @GetMapping("/download1")
-    public void downloadFiles(HttpServletRequest request, HttpServletResponse response){
+        File file = new File(filepath);
+        if (!file.exists() || !file.isFile()) {
+            return;
+        }else if(!StringUtils.isEmpty(args[1]))
+        {
+            downloadName = args[1];
+        }else{
+            downloadName = filepath.substring(filepath.lastIndexOf(File.pathSeparatorChar),filepath.length());
+        }
+
         //响应头的设置
         response.reset();
         response.setCharacterEncoding("utf-8");
@@ -28,13 +42,12 @@ public class GreetingController {
 
         //设置压缩包的名字
         //解决不同浏览器压缩包名字含有中文时乱码的问题
-        String downloadName = "压缩文件1.zip";
         String agent = request.getHeader("USER-AGENT");
         try {
-            if (agent.contains("MSIE")||agent.contains("Trident")) {
+            if (agent.contains("MSIE") || agent.contains("Trident")) {
                 downloadName = java.net.URLEncoder.encode(downloadName, "UTF-8");
             } else {
-                downloadName = new String(downloadName.getBytes("UTF-8"),"ISO-8859-1");
+                downloadName = new String(downloadName.getBytes("UTF-8"), "ISO-8859-1");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -49,11 +62,10 @@ public class GreetingController {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        File file = new File("D:\\Project\\demo-filedownload\\temp");
         File[] files = file.listFiles();
         //循环将文件写入压缩流
         DataOutputStream os = null;
-        for(int i = 0; i < files.length; i++ ){//要下载的文件个数
+        for (int i = 0; i < files.length; i++) {//要下载的文件个数
 
             File tempfile = files[i];
             try {
@@ -64,7 +76,7 @@ public class GreetingController {
                 InputStream is = new FileInputStream(tempfile);
                 byte[] b = new byte[100];
                 int length = 0;
-                while((length = is.read(b))!= -1){
+                while ((length = is.read(b)) != -1) {
                     os.write(b, 0, length);
                 }
                 is.close();
@@ -82,39 +94,29 @@ public class GreetingController {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
     }
 
 
-
-    @ResponseBody
-    @GetMapping("/download2")
-    public void download2(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        //响应头的设置
-        response.reset();
-        response.setCharacterEncoding("utf-8");
-        response.setContentType("multipart/form-data");
-
-        //设置压缩包的名字
-        //解决不同浏览器压缩包名字含有中文时乱码的问题
-        String downloadName = "wenjianming.iso";
-        String agent = request.getHeader("USER-AGENT");
+    public static void download(HttpServletResponse response,String path) throws IOException {
+        InputStream inputStream = null;
+        OutputStream outputStream = response.getOutputStream();
         try {
-            if (agent.contains("MSIE")||agent.contains("Trident")) {
-                downloadName = java.net.URLEncoder.encode(downloadName, "UTF-8");
-            } else {
-                downloadName = new String(downloadName.getBytes("UTF-8"),"ISO-8859-1");
+
+            File file = new File(path);
+            //使用bufferedInputStream 缓存流的方式来获取下载文件，不然大文件会出现内存溢出的情况
+            inputStream = new FileInputStream(file);
+            //这里也很关键每次读取的大小为5M 不一次性读取完
+            byte[] buffer = new byte[1024 * 1024 * 5];// 5MB
+            int len = 0;
+            while ((len = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, len);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        }catch (Exception e){
+
+        }finally {
+            IOUtils.closeQuietly(outputStream);
+            IOUtils.closeQuietly(inputStream);
         }
-        response.setHeader("Content-Disposition", "attachment;fileName=\"" + downloadName + "\"");
-        response.getOutputStream();
-
-
-        FileUtil.download(response,"D:\\cn_sql_server_2017_developer_x64_dvd_11296175.iso");
 
     }
-
-
 }
